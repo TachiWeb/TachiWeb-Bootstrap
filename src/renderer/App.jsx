@@ -11,8 +11,9 @@ import { spawn } from 'child_process'
 import mkdirp from 'mkdirp2'
 import fs from 'fs'
 import streamSplitter from 'stream-splitter'
-import InstallJava from "./InstallJava";
-import ServerError from "./ServerError";
+import InstallJava from "./InstallJava"
+import ServerError from "./ServerError"
+import staticPath from "./staticPath"
 
 const DEFAULT_PORT = 4567
 const APP_PATH = path.join(remote.app.getPath("appData"), "TachiWeb")
@@ -20,7 +21,7 @@ const TW_CONFIG_FOLDER = path.join(APP_PATH, "tachiserver-data", "config")
 const TW_CONFIG = path.join(TW_CONFIG_FOLDER, "bootstrap.conf")
 const HTTP_BOOT_MESSAGE = "HTTP-SERVER-BOOTED"
 
-const TW_BINARY = path.join(__static, "tachiserver.jar")
+const TW_BINARY = path.join(staticPath, "tachiserver.jar")
 
 export default class App extends Component {
     constructor(props) {
