@@ -1,6 +1,7 @@
 {
   "name": "tachiweb",
   "productName": "TacihWeb",
+  "homepage": "https://github.com/TachiWeb/TachiWeb-Server",
   "version": "0.0.1",
   "license": "MIT",
   "author": "nulldev <contactnulldev@gmail.com>",
