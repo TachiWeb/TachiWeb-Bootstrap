@@ -17,7 +17,7 @@
     "dev": "electron-webpack dev",
     "compile": "electron-webpack",
     "dist": "yarn compile && electron-builder",
-    "dist:linuxWindows": "yarn compile && electron-builder -lw",
+    "distLinuxWindows": "yarn compile && electron-builder -lw",
     "dist:dir": "yarn dist --dir -c.compression=store -c.mac.identity=null"
   },
   "dependencies": {
