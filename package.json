@@ -1,8 +1,18 @@
 {
-  "name": "tachiweb-bootstrap",
+  "name": "tachiweb",
   "productName": "TacihWeb",
   "version": "0.0.0",
   "license": "MIT",
+  "author": "nulldev",
+  "contributors": [
+    {
+      "name" : "inorichi"
+    },
+    {
+      "name" : "LigerX"
+    }
+  ],
+  "description": "A port of the Tachiyomi manga reader to PCs.",
   "scripts": {
     "dev": "electron-webpack dev",
     "compile": "electron-webpack",
@@ -24,7 +34,7 @@
   "devDependencies": {
     "@babel/preset-react": "^7.0.0-beta.51",
     "electron": "^2.0.3",
-    "electron-builder": "^20.11.1",
+    "electron-builder": "20.14.7",
     "electron-webpack": "^2.0.1",
     "webpack": "^4.8.1"
   },
@@ -38,8 +48,17 @@
     "mac": {
       "category": "public.app-category.entertainment"
     },
-    "directories": {
-      "buildResources": "build-res"
+    "linux": {
+      "category": "Network",
+      "target": [
+        {"target": "tar.gz"},
+        {"target": "AppImage"}
+      ]
+    },
+    "snap": {
+      "buildPackages": [
+        "openjdk-8-jdk"
+      ]
     }
   },
   "electronWebpack": {
