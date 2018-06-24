@@ -75,7 +75,7 @@ if (hasSingleInstance) {
 
     ipcMain.on('pid-queue', (event, arg) => {
         let killProc = () => {
-            process.kill(arg)
+            try {process.kill(arg)} catch(e) {}
         }
 
         let killAppAndProc = () => {
@@ -123,6 +123,10 @@ function createMainWindow() {
         setImmediate(() => {
             window.focus()
         })
+    })
+
+    ipcMain.on('open-dev-console', () => {
+        window.webContents.openDevTools()
     })
 
     return window

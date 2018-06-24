@@ -6,10 +6,10 @@
   "author": "nulldev",
   "contributors": [
     {
-      "name" : "inorichi"
+      "name": "inorichi"
     },
     {
-      "name" : "LigerX"
+      "name": "LigerX"
     }
   ],
   "description": "A port of the Tachiyomi manga reader to PCs.",
@@ -23,6 +23,7 @@
     "detect-port": "^1.2.3",
     "find-java-home": "^0.2.0",
     "mkdirp2": "^1.0.4",
+    "mousetrap": "^1.6.2",
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
     "react-helmet": "^5.2.0",
@@ -51,8 +52,12 @@
     "linux": {
       "category": "Network",
       "target": [
-        {"target": "tar.gz"},
-        {"target": "AppImage"}
+        {
+          "target": "tar.gz"
+        },
+        {
+          "target": "AppImage"
+        }
       ]
     },
     "snap": {

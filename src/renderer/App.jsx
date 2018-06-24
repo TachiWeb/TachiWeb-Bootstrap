@@ -12,6 +12,7 @@ import mkdirp from 'mkdirp2'
 import fs from 'fs'
 import streamSplitter from 'stream-splitter'
 import InstallJava from "./InstallJava";
+import ServerError from "./ServerError";
 
 const DEFAULT_PORT = 4567
 const APP_PATH = path.join(remote.app.getPath("appData"), "TachiWeb")
@@ -25,12 +26,14 @@ export default class App extends Component {
     constructor(props) {
         super(props);
         this.logRef = React.createRef();
+        this.mounted = false
 
         this.state = {
             percent: 0,
             task: 'Please wait...',
             log: [],
-            javaError: false
+            javaError: false,
+            serverError: false
         }
     }
 
@@ -59,11 +62,14 @@ export default class App extends Component {
                 </Form>
 
                 <InstallJava open={this.state.javaError}/>
+                <ServerError open={this.state.serverError}/>
             </Container>
         )
     }
 
     log(entry) {
+        console.log(entry)
+
         this.setState({
             log: this.state.log.concat([entry])
         })
@@ -89,6 +95,8 @@ export default class App extends Component {
     }
 
     componentDidMount() {
+        this.mounted = true
+
         this.task(`Looking for available port (default is: ${DEFAULT_PORT})...`)
         detect(DEFAULT_PORT, (err, _port) => {
             let chosenPort
@@ -109,6 +117,10 @@ export default class App extends Component {
             this.percent(33)
             this.searchForJava(chosenPort)
         });
+    }
+
+    componentWillUnmount() {
+        this.mounted = false
     }
 
     searchForJava(chosenPort) {
@@ -174,6 +186,7 @@ export default class App extends Component {
             let splitter = proc.stdout.pipe(streamSplitter("\n"))
             splitter.encoding = "utf8"
             splitter.on("token", (token) => {
+                this.log()
                 if(token.trim() === HTTP_BOOT_MESSAGE) {
                     this.percent(100)
                     this.task("Launching UI...")
@@ -181,6 +194,14 @@ export default class App extends Component {
                     window.location = "http://127.0.0.1:" + chosenPort
                 }
             });
+
+            proc.on('exit', () => {
+                this.log("Process exited with code: " + proc.exitCode)
+
+                if(this.mounted) {
+                    this.setState({serverError: true})
+                }
+            })
         })
     }
 }
