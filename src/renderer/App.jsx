@@ -186,7 +186,7 @@ export default class App extends Component {
             let splitter = proc.stdout.pipe(streamSplitter("\n"))
             splitter.encoding = "utf8"
             splitter.on("token", (token) => {
-                this.log()
+                this.log(token)
                 if(token.trim() === HTTP_BOOT_MESSAGE) {
                     this.percent(100)
                     this.task("Launching UI...")
