@@ -82,7 +82,7 @@
         }
       ]
     },
-    "windows": {
+    "win": {
       "target": [
         {
           "target": "nsis",
