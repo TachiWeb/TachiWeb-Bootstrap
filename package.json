@@ -86,7 +86,7 @@
           ]
         },
         {
-          "target": "zip",
+          "target": "dir",
           "arch": [
             "x64",
             "ia32"
