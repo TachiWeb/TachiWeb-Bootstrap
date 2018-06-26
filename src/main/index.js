@@ -35,6 +35,12 @@ if (hasSingleInstance) {
         }
     })
 
+    // quit application when all windows are closed
+    app.on('window-all-closed', () => {
+        isQuitting = true
+        app.quit()
+    })
+
     // create main BrowserWindow when electron is ready
     app.on('ready', () => {
         mainWindow = createMainWindow()
@@ -82,8 +88,8 @@ if (hasSingleInstance) {
 
         let killAppAndProc = () => {
             isQuitting = true
-            app.quit()
             killProc()
+            app.quit()
         }
 
         // Make sure that process dies at all costs
