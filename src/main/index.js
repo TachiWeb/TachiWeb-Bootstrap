@@ -1,6 +1,6 @@
 'use strict'
 
-import { app, BrowserWindow, Menu, Tray, ipcMain } from 'electron'
+import { app, BrowserWindow, Menu, Tray, ipcMain, shell } from 'electron'
 import * as path from 'path'
 import { format as formatUrl } from 'url'
 
@@ -131,6 +131,12 @@ function createMainWindow() {
         setImmediate(() => {
             window.focus()
         })
+    })
+
+    // Open new windows in browser window
+    window.webContents.on('new-window', (event, url) => {
+        event.preventDefault()
+        shell.openExternal(url)
     })
 
     ipcMain.on('open-dev-console', () => {
