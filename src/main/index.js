@@ -11,7 +11,7 @@ let mainWindow
 let tray
 
 const iconPath = path.join(__static, '/icon.png')
-const iconPath32 = path.join(__static, '/icon32.png')
+const iconPath64 = path.join(__static, '/icon64.png')
 
 const hasSingleInstance = app.makeSingleInstance(() => {
     // Someone tried to run a second instance, we should focus our window.
@@ -45,7 +45,7 @@ if (hasSingleInstance) {
     app.on('ready', () => {
         mainWindow = createMainWindow()
 
-        tray = new Tray(iconPath32)
+        tray = new Tray(iconPath64)
         const contextMenu = Menu.buildFromTemplate([
             {
                 label: 'Show window',
