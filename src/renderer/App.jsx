@@ -10,6 +10,7 @@ import { Helmet } from 'react-helmet'
 import { spawn } from 'child_process'
 import mkdirp from 'mkdirp2'
 import fs from 'fs'
+import os from 'os'
 import streamSplitter from 'stream-splitter'
 import InstallJava from "./InstallJava"
 import ServerError from "./ServerError"
@@ -22,6 +23,11 @@ const TW_CONFIG = path.join(TW_CONFIG_FOLDER, "bootstrap.conf")
 const HTTP_BOOT_MESSAGE = "HTTP-SERVER-BOOTED"
 
 const TW_BINARY = path.join(staticPath, "tachiserver.jar")
+
+const JAVA_WINDOWS_DIRECTORIES = [
+    "C:\\Program Files\\Java",
+    "C:\\Program Files (x86)\\Java"
+]
 
 export default class App extends Component {
     constructor(props) {
@@ -127,35 +133,16 @@ export default class App extends Component {
     searchForJava(chosenPort) {
         this.task("Searching for Java...")
         let that = this
-        findJavaHome({allowJre: true}, function(err, home){
+        this.tryFindJava(function(err, binary) {
             if(err) {
                 that.log("Unable to find Java!")
                 that.setState({javaError: true})
                 return;
             }
 
-            that.log(`Found JAVA_HOME at: ${home}!`);
-            that.percent(50)
-
-            let javaFolder = path.join(home, "bin")
-            let windowsJava = path.join(javaFolder, "java.exe")
-            let unixJava = path.join(javaFolder, "java")
-            let theJava
-
-            if(fs.existsSync(windowsJava)) {
-                theJava = windowsJava
-            } else if(fs.existsSync(unixJava)) {
-                theJava = unixJava
-            } else {
-                that.log("Unable to find Java binary!")
-                that.setState({javaError: true})
-                return;
-            }
-
-            that.log(`Found java binary at: ${theJava}!`);
-
+            that.log(`Found Java binary at: ${binary}!`);
             that.percent(66)
-            that.configureApp(theJava, chosenPort)
+            that.configureApp(binary, chosenPort)
         });
     }
 
@@ -206,6 +193,51 @@ export default class App extends Component {
                 }
             })
         })
+    }
+
+    tryFindJava(callback) {
+        findJavaHome({allowJre: true}, function(err, home) {
+            let javaFolder = null
+
+            if(err) {
+                if(os.platform() === 'win32') {
+                    const isDirectory = source => fs.lstatSync(source).isDirectory()
+
+                    for(dir of JAVA_WINDOWS_DIRECTORIES) {
+                        if(isDirectory(dir)) {
+                            let dir = fs.readdirSync(source)
+                                .map(name => path.join(source, name))
+                                .filter(isDirectory)
+
+                            if(dir.length >= 1) {
+                                javaFolder = dir
+                                break
+                            }
+                        }
+                    }
+
+                    if(javaFolder == null) {
+                        callback("Unable to find Java home", null)
+                        return
+                    }
+                } else {
+                    callback("Unable to find Java home", null)
+                    return
+                }
+            } else {
+                javaFolder = path.join(home, "bin")
+            }
+            let windowsJava = path.join(javaFolder, "java.exe")
+            let unixJava = path.join(javaFolder, "java")
+
+            if(fs.existsSync(windowsJava)) {
+                callback(null, windowsJava)
+            } else if(fs.existsSync(unixJava)) {
+                callback(null, unixJava)
+            } else {
+                callback("Unable to find Java binary", null)
+            }
+        });
     }
 }
 
