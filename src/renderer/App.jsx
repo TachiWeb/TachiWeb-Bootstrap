@@ -199,18 +199,18 @@ export default class App extends Component {
         findJavaHome({allowJre: true}, function(err, home) {
             let javaFolder = null
 
-            if(err) {
+            if(err || home == null) {
                 if(os.platform() === 'win32') {
                     const isDirectory = source => fs.lstatSync(source).isDirectory()
 
                     for(dir of JAVA_WINDOWS_DIRECTORIES) {
                         if(isDirectory(dir)) {
-                            let dir = fs.readdirSync(source)
+                            let child = fs.readdirSync(source)
                                 .map(name => path.join(source, name))
                                 .filter(isDirectory)
 
-                            if(dir.length >= 1) {
-                                javaFolder = dir
+                            if(child.length >= 1) {
+                                javaFolder = child[0]
                                 break
                             }
                         }

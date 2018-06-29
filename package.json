@@ -38,7 +38,7 @@
   "devDependencies": {
     "@babel/preset-react": "^7.0.0-beta.51",
     "electron": "^2.0.3",
-    "electron-builder": "20.14.7",
+    "electron-builder": "^20.19.0",
     "electron-webpack": "^2.0.1",
     "webpack": "^4.8.1"
   },
@@ -80,9 +80,10 @@
     "win": {
       "target": [
         {
-          "target": "squirrel",
+          "target": "msi",
           "arch": [
-            "x64"
+            "x64",
+            "ia32"
           ]
         },
         {
