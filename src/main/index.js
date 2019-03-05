@@ -1,8 +1,8 @@
 'use strict'
 
-import { app, BrowserWindow, Menu, Tray, ipcMain, shell } from 'electron'
+import {app, BrowserWindow, ipcMain, Menu, shell, Tray} from 'electron'
 import * as path from 'path'
-import { format as formatUrl } from 'url'
+import {format as formatUrl} from 'url'
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
@@ -13,21 +13,23 @@ let tray
 const iconPath = path.join(__static, '/icon.png')
 const iconPath64 = path.join(__static, '/icon64.png')
 
-const hasSingleInstance = app.makeSingleInstance(() => {
-    // Someone tried to run a second instance, we should focus our window.
-    if (mainWindow) {
-        mainWindow.show()
-        if (mainWindow.isMinimized()) mainWindow.restore()
-        mainWindow.focus()
-    }
-})
+const hasSingleInstance = app.requestSingleInstanceLock()
 
 let isQuitting = false
 
-if (hasSingleInstance) {
+if (!hasSingleInstance) {
     isQuitting = true
     app.quit()
 } else {
+    app.on('second-instance', () => {
+        // Someone tried to run a second instance, we should focus our window.
+        if (mainWindow) {
+            mainWindow.show()
+            if (mainWindow.isMinimized()) mainWindow.restore()
+            mainWindow.focus()
+        }
+    })
+
     app.on('activate', () => {
         // on macOS it is common to re-create a window even after all windows have been closed
         if (mainWindow === null) {

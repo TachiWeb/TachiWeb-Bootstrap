@@ -1,13 +1,13 @@
 import React, {Component} from 'react'
 import {findDOMNode} from 'react-dom'
-import { Header, Image, Container, Progress, TextArea, Form } from 'semantic-ui-react'
+import {Container, Form, Header, Image, Progress, TextArea} from 'semantic-ui-react'
 import * as path from 'path'
 import TachiyomiIcon from './assets/icon.png'
 import detect from 'detect-port'
-import findJavaHome from 'find-java-home'
-import { remote, ipcRenderer } from 'electron'
-import { Helmet } from 'react-helmet'
-import { spawn } from 'child_process'
+import LocateJavaHome from 'locate-java-home'
+import {ipcRenderer, remote} from 'electron'
+import {Helmet} from 'react-helmet'
+import {spawn} from 'child_process'
 import mkdirp from 'mkdirp2'
 import fs from 'fs'
 import os from 'os'
@@ -196,10 +196,15 @@ export default class App extends Component {
     }
 
     tryFindJava(callback) {
-        findJavaHome({allowJre: true}, function(err, home) {
+        LocateJavaHome({
+            version: ">=1.8",
+            mustBeJDK: false,
+            mustBeJRE: false,
+            mustBe64Bit: false
+        }, function (error, javaHomes) {
             let javaFolder = null
 
-            if(err || home == null) {
+            if (error || javaHomes.length <= 0) {
                 if(os.platform() === 'win32') {
                     const isDirectory = source => fs.lstatSync(source).isDirectory()
 
@@ -225,7 +230,7 @@ export default class App extends Component {
                     return
                 }
             } else {
-                javaFolder = path.join(home, "bin")
+                javaFolder = path.join(javaHomes[0].path, "bin")
             }
             let windowsJava = path.join(javaFolder, "java.exe")
             let unixJava = path.join(javaFolder, "java")
@@ -237,7 +242,7 @@ export default class App extends Component {
             } else {
                 callback("Unable to find Java binary", null)
             }
-        });
+        })
     }
 }
 
