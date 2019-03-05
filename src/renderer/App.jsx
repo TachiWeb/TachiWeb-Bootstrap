@@ -7,27 +7,24 @@ import detect from 'detect-port'
 import LocateJavaHome from 'locate-java-home'
 import {ipcRenderer, remote} from 'electron'
 import {Helmet} from 'react-helmet'
-import {spawn} from 'child_process'
 import mkdirp from 'mkdirp2'
+import AdmZip from 'adm-zip'
 import fs from 'fs'
-import os from 'os'
-import streamSplitter from 'stream-splitter'
 import InstallJava from "./InstallJava"
 import ServerError from "./ServerError"
 import staticPath from "./staticPath"
 
+const PATCH_NAME = "java.base-patch.jar"
+const PATCH_LOCATION = "patches/" + PATCH_NAME
+
 const DEFAULT_PORT = 4567
 const APP_PATH = path.join(remote.app.getPath("appData"), "TachiWeb")
 const TW_CONFIG_FOLDER = path.join(APP_PATH, "tachiserver-data", "config")
+const TW_PATCH_EXTRACT_LOCATION = path.join(APP_PATH, "tachiserver-data", "patches")
 const TW_CONFIG = path.join(TW_CONFIG_FOLDER, "bootstrap.conf")
 const HTTP_BOOT_MESSAGE = "HTTP-SERVER-BOOTED"
 
 const TW_BINARY = path.join(staticPath, "tachiserver.jar")
-
-const JAVA_WINDOWS_DIRECTORIES = [
-    "C:\\Program Files\\Java",
-    "C:\\Program Files (x86)\\Java"
-]
 
 export default class App extends Component {
     constructor(props) {
@@ -77,13 +74,15 @@ export default class App extends Component {
     log(entry) {
         console.log(entry)
 
-        this.setState({
-            log: this.state.log.concat([entry])
-        })
+        if (this.mounted) {
+            this.setState({
+                log: this.state.log.concat([entry])
+            })
 
-        if(this.logRef.current) {
-            let dom = findDOMNode(this.logRef.current)
-            dom.scrollTop = dom.scrollHeight;
+            if (this.logRef.current) {
+                let dom = findDOMNode(this.logRef.current)
+                dom.scrollTop = dom.scrollHeight;
+            }
         }
     }
 
@@ -133,114 +132,125 @@ export default class App extends Component {
     searchForJava(chosenPort) {
         this.task("Searching for Java...")
         let that = this
-        this.tryFindJava(function(err, binary) {
+        this.tryFindJava(function (err, binary, isJava8) {
             if(err) {
                 that.log("Unable to find Java!")
                 that.setState({javaError: true})
                 return;
             }
 
-            that.log(`Found Java binary at: ${binary}!`);
-            that.percent(66)
-            that.configureApp(binary, chosenPort)
+            that.log(`Found Java ${isJava8 ? "1.8" : "9+"} binary at: ${binary}!`);
+            that.percent(50)
+            that.configureApp(binary, isJava8, chosenPort)
         });
     }
 
-    configureApp(javaBin, chosenPort) {
+    configureApp(javaBin, isJava8, chosenPort) {
         this.task("Configuring application...")
         this.log("App data directory: " + APP_PATH)
         this.log("Configuration location: " + TW_CONFIG)
         mkdirp.mkdirP(TW_CONFIG_FOLDER, {}, () => {
-            this.percent(70)
+            this.percent(60)
 
             this.log("Building config...")
             let config = "ts.server.port=" + chosenPort
             config += "\nts.server.httpInitializedPrintMessage=" + HTTP_BOOT_MESSAGE
 
             this.log("Writing config...")
-            fs.writeFileSync(TW_CONFIG, config)
-            this.percent(80)
+            fs.writeFile(TW_CONFIG, config, () => {
+                this.percent(70)
 
-            let args = ["-jar", TW_BINARY]
-            this.task("Starting server...")
-            this.log("Running command: " + [javaBin].concat(args).join(" "))
-            let proc = spawn(javaBin, args, { cwd: APP_PATH })
+                this.log("Extracting patches...")
+                let zipFile = new AdmZip(TW_BINARY)
+                zipFile.extractEntryTo(PATCH_LOCATION, TW_PATCH_EXTRACT_LOCATION, false, true)
+                this.percent(80)
 
-            ipcRenderer.send('pid-queue', proc.pid)
+                let patchArgs;
+                if (isJava8) {
+                    patchArgs = ["-Xbootclasspath/p:" + TW_PATCH_EXTRACT_LOCATION];
+                } else {
+                    patchArgs = ["--patch-module", "java.base=" + TW_PATCH_EXTRACT_LOCATION, "--add-reads", "java.base=java.logging"];
+                }
 
-            this.percent(90)
+                let args = patchArgs.concat(["-Dts.bootstrap.active=true", "-jar", TW_BINARY])
+                this.task("Starting server...")
+                this.log("Running command: " + [javaBin].concat(args).join(" "))
 
-            proc.stdout.setEncoding('utf8');
-            let splitter = proc.stdout.pipe(streamSplitter("\n"))
-            splitter.encoding = "utf8"
-            splitter.on("token", (token) => {
-                if(this.mounted) {
-                    this.log(token)
-                    if (token.trim() === HTTP_BOOT_MESSAGE) {
-                        this.percent(100)
-                        this.task("Launching UI...")
+                let bootPort = chosenPort
 
-                        window.location = "http://127.0.0.1:" + chosenPort
+                ipcRenderer.send('boot-server', {
+                    command: javaBin,
+                    args: args,
+                    options: {cwd: APP_PATH},
+                    port: chosenPort
+                })
+
+                ipcRenderer.on('server-change-port', (event, port) => {
+                    bootPort = port
+                })
+
+                ipcRenderer.on('server-stdout', (event, token) => {
+                    this.log("[SERVER-STDOUT] " + token)
+                    if (this.mounted) {
+                        if (token.trim() === HTTP_BOOT_MESSAGE) {
+                            this.percent(100)
+                            this.task("Launching UI...")
+
+                            window.location = "http://127.0.0.1:" + bootPort
+                        }
                     }
-                }
-            });
+                })
 
-            proc.on('exit', () => {
-                this.log("Process exited with code: " + proc.exitCode)
+                ipcRenderer.on('server-stderr', (event, token) => {
+                    this.log("[SERVER-STDERR] " + token)
+                })
 
-                if(this.mounted) {
-                    this.setState({serverError: true})
-                }
+                ipcRenderer.on('server-death', (event, exitCode) => {
+                    this.log("Process exited with code: " + exitCode)
+
+                    if (this.mounted) {
+                        this.setState({serverError: true})
+                    }
+                })
+
+                this.percent(90)
             })
         })
     }
 
     tryFindJava(callback) {
+        this.tryFindJavaVersion("~1.8", (error, binary) => {
+            if (!error) {
+                callback(null, binary, true)
+            } else {
+                this.tryFindJavaVersion(">=1.9", (error, binary) => {
+                    if (!error) {
+                        callback(null, binary, false)
+                    } else callback(error)
+                })
+            }
+        })
+    }
+
+    tryFindJavaVersion(versionString, callback) {
         LocateJavaHome({
-            version: ">=1.8",
+            version: versionString,
             mustBeJDK: false,
             mustBeJRE: false,
             mustBe64Bit: false
         }, function (error, javaHomes) {
-            let javaFolder = null
-
             if (error || javaHomes.length <= 0) {
-                if(os.platform() === 'win32') {
-                    const isDirectory = source => fs.lstatSync(source).isDirectory()
-
-                    for(dir of JAVA_WINDOWS_DIRECTORIES) {
-                        if(isDirectory(dir)) {
-                            let child = fs.readdirSync(source)
-                                .map(name => path.join(source, name))
-                                .filter(isDirectory)
-
-                            if(child.length >= 1) {
-                                javaFolder = child[0]
-                                break
-                            }
-                        }
-                    }
-
-                    if(javaFolder == null) {
-                        callback("Unable to find Java home", null)
-                        return
-                    }
-                } else {
-                    callback("Unable to find Java home", null)
-                    return
-                }
-            } else {
-                javaFolder = path.join(javaHomes[0].path, "bin")
+                callback("Unable to find Java home")
+                return
             }
-            let windowsJava = path.join(javaFolder, "java.exe")
-            let unixJava = path.join(javaFolder, "java")
 
-            if(fs.existsSync(windowsJava)) {
-                callback(null, windowsJava)
-            } else if(fs.existsSync(unixJava)) {
-                callback(null, unixJava)
+            let javaHome = javaHomes[0];
+            let binary = javaHome.executables.java
+
+            if (fs.existsSync(binary)) {
+                callback(null, binary)
             } else {
-                callback("Unable to find Java binary", null)
+                callback("Unable to find Java binary")
             }
         })
     }

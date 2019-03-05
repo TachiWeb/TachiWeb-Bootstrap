@@ -23,6 +23,7 @@
     "dist:dir": "yarn dist --dir -c.compression=store -c.mac.identity=null"
   },
   "dependencies": {
+    "adm-zip": "^0.4.13",
     "detect-port": "^1.3.0",
     "locate-java-home": "^1.1.2",
     "mkdirp2": "^1.0.4",
@@ -126,4 +127,3 @@
     }
   }
 }
-

@@ -3,6 +3,8 @@
 import {app, BrowserWindow, ipcMain, Menu, shell, Tray} from 'electron'
 import * as path from 'path'
 import {format as formatUrl} from 'url'
+import {spawn} from 'child_process'
+import streamSplitter from 'stream-splitter'
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
@@ -16,6 +18,10 @@ const iconPath64 = path.join(__static, '/icon64.png')
 const hasSingleInstance = app.requestSingleInstanceLock()
 
 let isQuitting = false
+let hasKilledApp = false;
+
+let serverPort = -1
+let serverProcess = null
 
 if (!hasSingleInstance) {
     isQuitting = true
@@ -83,23 +89,66 @@ if (!hasSingleInstance) {
         });
     })
 
-    ipcMain.on('pid-queue', (event, arg) => {
-        let killProc = () => {
-            try {process.kill(arg)} catch(e) {}
+    ipcMain.on('boot-server', (event, args) => {
+        if (serverProcess != null) {
+            console.log(`Attempted to start server with ${args} when server is already running on: ${serverPort}!`)
+            mainWindow.webContents.send('server-change-port', serverPort)
+            return;
         }
 
-        let killAppAndProc = () => {
-            isQuitting = true
-            killProc()
-            app.quit()
+        console.log(`Spawning server with: ${args}`)
+        serverProcess = spawn(args.command, args.args, args.options)
+        serverPort = args.port
+
+        serverProcess.stdout.setEncoding('utf8');
+        serverProcess.stderr.setEncoding('utf8');
+        let splitter = serverProcess.stdout.pipe(streamSplitter("\n"))
+        splitter.encoding = "utf8"
+        splitter.on("token", (token) => {
+            console.log("[SERVER-STDOUT] " + token + "\n")
+            mainWindow.webContents.send('server-stdout', token)
+        })
+
+        let stdErrSplitter = serverProcess.stderr.pipe(streamSplitter("\n"))
+        stdErrSplitter.encoding = "utf8"
+        stdErrSplitter.on("token", (token) => {
+            console.log("[SERVER-STDERR] " + token + "\n")
+            mainWindow.webContents.send('server-stderr', token)
+        })
+
+        serverProcess.on('exit', (code) => {
+            serverProcess = null
+            mainWindow.webContents.send('server-death', code)
+        })
+    })
+
+    let killProcs = (callback) => {
+        if (serverProcess != null) {
+            // TODO Try killing server via API call before doing this
+            //   as killing the server like this on Window may result in data corruption
+            console.log("Killing: " + serverProcess.pid)
+            serverProcess.kill()
+            serverProcess = null
         }
 
-        // Make sure that process dies at all costs
-        app.on('will-quit', killProc)
-        app.on('before-quit', killProc)
-        process.on('SIGINT', killAppAndProc); // catch ctrl-c
-        process.on('SIGTERM', killAppAndProc); // catch kill
-    });
+        callback()
+    }
+
+    let killAppAndProcs = () => {
+        isQuitting = true
+        killProcs(() => {
+            if (!hasKilledApp) {
+                hasKilledApp = true
+                app.quit()
+            }
+        })
+    }
+
+    // Make sure that JVM dies at all costs
+    app.on('will-quit', killAppAndProcs)
+    app.on('before-quit', killAppAndProcs)
+    process.on('SIGINT', killAppAndProcs); // catch ctrl-c
+    process.on('SIGTERM', killAppAndProcs); // catch kill
 
     ipcMain.on('quit', () => {
         isQuitting = true
