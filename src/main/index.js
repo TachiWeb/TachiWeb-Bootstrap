@@ -5,6 +5,8 @@ import * as path from 'path'
 import {format as formatUrl} from 'url'
 import {spawn} from 'child_process'
 import streamSplitter from 'stream-splitter'
+import OpenAPIClientAxios from "openapi-client-axios";
+import Axios from "axios";
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
@@ -124,11 +126,18 @@ if (!hasSingleInstance) {
 
     let killProcs = (callback) => {
         if (serverProcess != null) {
-            // TODO Try killing server via API call before doing this
-            //   as killing the server like this on Window may result in data corruption
-            console.log("Killing: " + serverProcess.pid)
-            serverProcess.kill()
+            let serverProcessTmp = serverProcess;
             serverProcess = null
+
+            console.log("Stopping server...")
+            apiClient().then((client) => {
+                return client.stopServer()
+            }).catch((error) => {
+                console.log("Failed to stop server gracefully!", error)
+                console.log("Killing server: " + serverProcessTmp.pid)
+                serverProcessTmp.kill()
+            }).then(() => {
+            }).then(callback)
         }
 
         callback()
@@ -195,4 +204,23 @@ function createMainWindow() {
     })
 
     return window
+}
+
+let existingApiClient = null;
+
+function apiClient() {
+    if (existingApiClient != null) return Promise.resolve(existingApiClient);
+    else {
+        let serverUrl = `http://localhost:${serverPort}`
+        return Axios.get(`${serverUrl}/api/v3`)
+            .then((response) => {
+                let definition = response.data
+                definition.servers = [{url: serverUrl}]
+                return new OpenAPIClientAxios({definition}).init()
+            })
+            .then((client) => {
+                existingApiClient = client;
+                return Promise.resolve(client)
+            })
+    }
 }
