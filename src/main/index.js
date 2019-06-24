@@ -167,13 +167,16 @@ if (!hasSingleInstance) {
 
 function createMainWindow() {
     const window = new BrowserWindow({
-        icon: iconPath
+        icon: iconPath,
+        webPreferences: {
+            nodeIntegration: true
+        }
     })
     window.setMenu(null)
 
-    // if (isDevelopment) {
-    //     window.webContents.openDevTools()
-    // }
+    if (isDevelopment) {
+        window.webContents.openDevTools()
+    }
 
     if (isDevelopment) {
         window.loadURL(`http://localhost:${process.env.ELECTRON_WEBPACK_WDS_PORT}`)
